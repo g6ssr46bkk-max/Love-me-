@@ -1,0 +1,103 @@
+index.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ICC Gold AI</title>
+<style>
+/* Dark mobile-friendly styles included here */
+body {margin:0;font-family:Arial,sans-serif;background:#1b1b1b;color:#f1f1f1;}
+header {padding:15px;text-align:center;background:#0d0d0d;font-size:1.5em;font-weight:bold;}
+.container {padding:15px;}
+.mode-switch {display:flex;justify-content:center;margin-bottom:15px;}
+.mode-switch button {margin:0 10px;padding:10px 20px;font-size:1em;border:none;border-radius:5px;cursor:pointer;}
+.mode-switch button.active {background:#4caf50;color:#fff;}
+.panel {background:#2a2a2a;padding:15px;margin-bottom:15px;border-radius:8px;}
+label{display:block;margin:5px 0 2px;}
+input[type="number"], select{width:100%;padding:8px;margin-bottom:8px;border-radius:5px;border:none;background:#1e1e1e;color:#fff;}
+button.calculate{width:100%;padding:12px;font-size:1em;border:none;border-radius:5px;background:#4caf50;color:#fff;cursor:pointer;}
+.signal-output{background:#333;padding:10px;border-radius:5px;font-family:monospace;white-space:pre-wrap;margin-top:10px;}
+.journal{max-height:200px;overflow-y:auto;}
+.journal-entry{padding:5px;border-bottom:1px solid #444;}
+canvas{width:100%;height:200px;background:#1e1e1e;border-radius:8px;display:block;margin-top:10px;}
+</style>
+</head>
+<body>
+<header>ICC Gold AI</header>
+<div class="container">
+<div class="mode-switch">
+<button id="sniperBtn" class="active">Sniper Mode</button>
+<button id="scannerBtn">Scanner Mode</button>
+</div>
+<div class="panel">
+<h3>Input Market Structure (XAUUSD)</h3>
+<label for="breakout">Breakout Level (Indication)</label>
+<input type="number" id="breakout" placeholder="e.g. 2180.50">
+<label for="correctionHigh">Correction High</label>
+<input type="number" id="correctionHigh" placeholder="e.g. 2182.50">
+<label for="correctionLow">Correction Low</label>
+<input type="number" id="correctionLow" placeholder="e.g. 2178.80">
+<label for="direction">Direction</label>
+<select id="direction">
+<option value="BUY">BUY</option>
+<option value="SELL">SELL</option>
+</select>
+<button class="calculate" onclick="calculateEntryZone()">Calculate Entry Zone</button>
+</div>
+<div class="panel">
+<h3>Signal Dashboard</h3>
+<div class="signal-output" id="signalOutput">No signal yet.</div>
+<canvas id="iccCanvas"></canvas>
+</div>
+<div class="panel">
+<h3>Trade Journal</h3>
+<div class="journal" id="journal"></div>
+</div>
+</div>
+<script>
+let mode='Sniper';
+document.getElementById('sniperBtn').addEventListener('click',()=>{mode='Sniper';document.getElementById('sniperBtn').classList.add('active');document.getElementById('scannerBtn').classList.remove('active');});
+document.getElementById('scannerBtn').addEventListener('click',()=>{mode='Scanner';document.getElementById('scannerBtn').classList.add('active');document.getElementById('sniperBtn').classList.remove('active');});
+function calculateEntryZone(){
+const breakout=parseFloat(document.getElementById('breakout').value);
+const correctionHigh=parseFloat(document.getElementById('correctionHigh').value);
+const correctionLow=parseFloat(document.getElementById('correctionLow').value);
+const direction=document.getElementById('direction').value;
+if(isNaN(breakout)||isNaN(correctionHigh)||isNaN(correctionLow)){alert('Please fill in all values.');return;}
+let fibLow,fibHigh;
+if(direction==='BUY'){fibLow=correctionLow+0.7*(correctionHigh-correctionLow);fibHigh=correctionLow+0.8*(correctionHigh-correctionLow);}
+else{fibLow=correctionHigh-0.8*(correctionHigh-correctionLow);fibHigh=correctionHigh-0.7*(correctionHigh-correctionLow);}
+let midPoint=(breakout+(direction==='BUY'?correctionLow:correctionHigh))/2;
+const entryLow=Math.min(fibLow,midPoint);
+const entryHigh=Math.max(fibHigh,midPoint);
+const stopLoss=direction==='BUY'?correctionLow:correctionHigh;
+const intradayTarget=direction==='BUY'?breakout+(entryHigh-entryLow)*2:breakout-(entryHigh-entryLow)*2;
+const swingTarget=direction==='BUY'?breakout+(entryHigh-entryLow)*5:breakout-(entryHigh-entryLow)*5;
+const signalText=`Mode: ${mode}\nDirection: ${direction}\nEntry Zone: ${entryLow.toFixed(2)} - ${entryHigh.toFixed(2)}\nStop Loss: ${stopLoss.toFixed(2)}\nIntraday Target: ${intradayTarget.toFixed(2)}\nSwing Target: ${swingTarget.toFixed(2)}`;
+document.getElementById('signalOutput').innerText=signalText;
+const journal=document.getElementById('journal');
+const entryDiv=document.createElement('div');entryDiv.className='journal-entry';
+entryDiv.innerText=`[${new Date().toLocaleString()}] ${signalText.replace(/\n/g,' | ')}`;
+journal.prepend(entryDiv);
+alert(`ICC Signal Detected: ${direction} | Entry Zone: ${entryLow.toFixed(2)} - ${entryHigh.toFixed(2)}`);
+drawICCFlow(correctionLow,correctionHigh,breakout,entryLow,entryHigh,direction);
+}
+function drawICCFlow(cLow,cHigh,breakout,entryLow,entryHigh,direction){
+const canvas=document.getElementById('iccCanvas');const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);
+const w=canvas.width,h=canvas.height;const prices=[cLow,cHigh,breakout,entryLow,entryHigh];
+const minPrice=Math.min(...prices)*0.999;
+const maxPrice=Math.max(...prices)*1.001;
+function yPos(price){return h-((price-minPrice)/(maxPrice-minPrice))*h;}
+ctx.fillStyle='#666';ctx.fillRect(w*0.1,yPos(cHigh),w*0.8,yPos(cLow)-yPos(cHigh));
+ctx.strokeStyle='#ffcc00';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,yPos(breakout));ctx.lineTo(w,yPos(breakout));ctx.stroke();
+ctx.fillStyle='#4caf50';ctx.fillRect(w*0.2,yPos(entryHigh),w*0.6,yPos(entryLow)-yPos(entryHigh));
+ctx.fillStyle='#fff';ctx.font='12px Arial';
+ctx.fillText('Consolidation',w*0.05,yPos(cHigh)-5);
+ctx.fillText('Breakout',w*0.8,yPos(breakout)-5);
+ctx.fillText('Entry Zone',w*0.05,yPos(entryHigh)-5);
+}
+</script>
+</body>
+</html>
